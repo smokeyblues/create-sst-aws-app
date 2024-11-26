@@ -2,7 +2,7 @@ package main
 
 import (
 	"archive/zip"
-	"bufio"
+	// "bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -13,8 +13,215 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	// tea "github.com/charmbracelet/bubbletea"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
+
+type model struct {
+	choices  []string
+	selected int
+	// err         error
+	projectName string
+	typing      bool
+}
+
+func initialModel() model {
+	return model{
+		choices:  []string{"Usage-based pricing", "SaaS pricing"},
+		selected: 0,
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	return nil
+}
+
+// Bubble Tea update function
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch {
+		case msg.String() == "ctrl+c":
+			return m, tea.Quit
+		case msg.String() == "q" && !m.typing:
+			return m, tea.Quit
+
+		case msg.String() == "up":
+			if !m.typing {
+				if m.selected > 0 {
+					m.selected--
+				}
+			}
+
+		case msg.String() == "down":
+			if !m.typing {
+				if m.selected < len(m.choices)-1 {
+					m.selected++
+				}
+			}
+
+		case msg.String() == "enter":
+			if !m.typing {
+				m.typing = true
+				return m, nil
+			} else {
+				m.projectName = strings.TrimSpace(m.projectName)
+				return m, tea.Quit
+			}
+		case msg.String() == "backspace":
+			if m.typing && len(m.projectName) > 0 {
+				m.projectName = m.projectName[:len(m.projectName)-1]
+				return m, nil
+			}
+			return m, nil
+
+		default:
+			if m.typing {
+				m.projectName += msg.String()
+				return m, nil
+			} else if msg.String() == "k" && m.selected > 0 {
+				m.selected--
+				return m, nil
+			} else if msg.String() == "j" && m.selected < len(m.choices)-1 {
+				m.selected++
+				return m, nil
+			}
+			// reader := bufio.NewReader(os.Stdin)
+
+			// fmt.Printf("What would you like to call your new project: ")
+
+			// // Read until new line
+			// newDir, _ := reader.ReadString('\n')
+
+			// newDir = strings.TrimSpace(newDir)
+			// m.projectName = newDir
+			// return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+// Bubble Tea view function
+func (m model) View() string {
+	if m.typing {
+		return fmt.Sprintf("Enter project name: %s\n", m.projectName)
+	}
+	s := "Choose a project type:\n\n"
+
+	for i, choice := range m.choices {
+		cursor := " "
+		if m.selected == i {
+			cursor = ">"
+		}
+		s += fmt.Sprintf("%s %s\n", cursor, choice)
+	}
+
+	s += "\nPress up/down keys to navigate, enter to select."
+	return s
+}
+
+func downloadProject(projectName string, projectType int) error {
+	owner := "smokeyblues"
+	repo := ""
+	branch := "main"
+
+	if projectType == 0 {
+		repo = "aws-sstv4-notes"
+	} else if projectType == 1 {
+		repo = "aws-sst-saas-template"
+	} else {
+		return fmt.Errorf("invalid project type selected")
+	}
+
+	err := downloadAndExtract(owner, repo, branch, ".", projectName)
+
+	if err != nil {
+		return fmt.Errorf("error downloading and extracting project: %w", err)
+	}
+	return nil
+}
+
+func main() {
+	p := tea.NewProgram(initialModel())
+	m, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error running Bubble Tea program: %v\n", err)
+		os.Exit(1)
+	}
+
+	selectedModel := m.(model)
+
+	fmt.Println("Creating project", selectedModel.projectName)
+	// Create the directory for a new project
+	err = os.MkdirAll(selectedModel.projectName, 0755)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// change directory to new directory
+	err = os.Chdir(selectedModel.projectName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error changing directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := downloadProject(selectedModel.projectName, selectedModel.selected); err != nil {
+		handleError(err)
+	}
+
+	if err != nil {
+		handleError(err)
+	}
+	fmt.Println("Project created successfully!")
+
+	// reader := bufio.NewReader(os.Stdin)
+
+	// fmt.Printf("What would you like to call your project: ")
+
+	// // Read until newline
+	// newDir, _ := reader.ReadString('\n')
+
+	// // Remove the trailing newline
+	// newDir = strings.TrimSpace(newDir)
+
+	// fmt.Println("Your new project shall be named", newDir)
+
+	// // Create the directory for new project
+	// err := os.MkdirAll(newDir, 0755)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error creating directory: %v\n", err)
+	// 	os.Exit(1) //Indicate an error with a non-zero exit code
+	// }
+
+	// // Change directory to the new directory
+	// err = os.Chdir(newDir)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error changing directory: %v\n", err)
+	// 	os.Exit(1)
+	// }
+
+	// fmt.Println("Current working directory:", getCurrentDirectory())
+
+	// // Go get project and write it to this directory
+	// err = downloadAndExtract("smokeyblues", "aws-sstv4-notes", "main", ".", newDir)
+	// if err != nil {
+	// 	fmt.Println("error in the download and extraction process.")
+	// 	handleError(err)
+	// }
+
+	// fmt.Println("Project created successfully.")
+
+}
+
+// func getCurrentDirectory() string {
+// 	currentDir, err := os.Getwd()
+// 	if err != nil {
+// 		fmt.Fprintf(os.Stderr, "Error getting current directory: %v", err)
+// 		os.Exit(1)
+// 	}
+// 	return currentDir
+// }
 
 func handleError(err error) {
 	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -88,7 +295,6 @@ func downloadAndExtract(owner, repo, branch, targetDir, newProjectName string) e
 			}
 
 			if strings.Contains(string(fileBytes), repo) {
-				fmt.Printf("Found '%s' in file: %s\n", repo, file.Name)
 				re := regexp.MustCompile(regexp.QuoteMeta(repo))
 
 				modifiedContent := re.ReplaceAllLiteralString(string(fileBytes), newProjectName)
@@ -106,53 +312,4 @@ func downloadAndExtract(owner, repo, branch, targetDir, newProjectName string) e
 		}
 	}
 	return nil
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Printf("What would you like to call your project: ")
-
-	// Read until newline
-	newDir, _ := reader.ReadString('\n')
-
-	// Remove the trailing newline
-	newDir = strings.TrimSpace(newDir)
-
-	fmt.Println("Your new project shall be named", newDir)
-
-	// Create the directory for new project
-	err := os.MkdirAll(newDir, 0755)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating directory: %v\n", err)
-		os.Exit(1) //Indicate an error with a non-zero exit code
-	}
-
-	// Change directory to the new directory
-	err = os.Chdir(newDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error changing directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("Current working directory:", getCurrentDirectory())
-
-	// Go get project and write it to this directory
-	err = downloadAndExtract("smokeyblues", "aws-sstv4-notes", "main", ".", newDir)
-	if err != nil {
-		fmt.Println("error in the download and extraction process.")
-		handleError(err)
-	}
-
-	fmt.Println("Project created successfully.")
-
-}
-
-func getCurrentDirectory() string {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v", err)
-		os.Exit(1)
-	}
-	return currentDir
 }
