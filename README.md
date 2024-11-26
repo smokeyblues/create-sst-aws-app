@@ -1,6 +1,6 @@
 # Serverless Full-Stack Application Generator
 
-This command-line tool simplifies the process of creating new full-stack serverless applications built with React, TypeScript, Vite, and AWS Lambda.  Choose from pre-built templates to kickstart your next project.
+This command-line tool simplifies the process of creating new full-stack serverless applications built with React, TypeScript, Vite on the frontend, and SST and AWS on the backend.  Choose from pre-built templates to kickstart your next project.
 
 ## Features
 
