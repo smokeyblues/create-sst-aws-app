@@ -2,14 +2,12 @@ package main
 
 import (
 	"archive/zip"
-	// "bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
 
-	// "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +21,7 @@ type model struct {
 	// err         error
 	projectName string
 	typing      bool
+	showHelp    bool
 }
 
 func initialModel() model {
@@ -43,22 +42,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case msg.String() == "ctrl+c":
 			return m, tea.Quit
-		case msg.String() == "q" && !m.typing:
-			return m, tea.Quit
+		case msg.String() == "q", msg.String() == "esc":
+			if m.showHelp {
+				m.showHelp = false
+			} else if !m.typing {
+				return m, tea.Quit
+			}
 
 		case msg.String() == "up":
-			if !m.typing {
+			if !m.typing && !m.showHelp {
 				if m.selected > 0 {
 					m.selected--
 				}
 			}
 
 		case msg.String() == "down":
-			if !m.typing {
+			if !m.typing && !m.showHelp {
 				if m.selected < len(m.choices)-1 {
 					m.selected++
 				}
 			}
+
+		case msg.String() == "h":
+			if !m.typing {
+				m.showHelp = !m.showHelp
+			}
+			return m, nil
 
 		case msg.String() == "enter":
 			if !m.typing {
@@ -86,16 +95,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected++
 				return m, nil
 			}
-			// reader := bufio.NewReader(os.Stdin)
-
-			// fmt.Printf("What would you like to call your new project: ")
-
-			// // Read until new line
-			// newDir, _ := reader.ReadString('\n')
-
-			// newDir = strings.TrimSpace(newDir)
-			// m.projectName = newDir
-			// return m, tea.Quit
 		}
 	}
 	return m, nil
@@ -103,6 +102,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // Bubble Tea view function
 func (m model) View() string {
+	if m.showHelp {
+		return "Help Screen\n\n" +
+			"Up/Down/j/k: Navigate\n" +
+			"Enter: Select option or start typing project name\n" +
+			"Backspace: Delete character (when typing)\n" +
+			"q or esc: Quit or Exit Help\n" +
+			"h: Toggle Help\n\n" +
+			"Press q or esc to exit help."
+	}
 	if m.typing {
 		return fmt.Sprintf("Enter project name: %s\n", m.projectName)
 	}
@@ -116,7 +124,7 @@ func (m model) View() string {
 		s += fmt.Sprintf("%s %s\n", cursor, choice)
 	}
 
-	s += "\nPress up/down keys to navigate, enter to select."
+	s += "\nPress up/down keys to navigate,\n" + "enter to select, h for help,\n" + "or q or esc to quit."
 	return s
 }
 
@@ -142,86 +150,38 @@ func downloadProject(projectName string, projectType int) error {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel())
+	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	m, err := p.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running Bubble Tea program: %v\n", err)
 		os.Exit(1)
 	}
 
-	selectedModel := m.(model)
+	// Check the model to determine if the program should quit or if the TUI quit so the program logic can begin.
+	if m.(model).projectName != "" {
+		selectedModel := m.(model)
+		fmt.Println("Creating project", selectedModel.projectName)
 
-	fmt.Println("Creating project", selectedModel.projectName)
-	// Create the directory for a new project
-	err = os.MkdirAll(selectedModel.projectName, 0755)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating directory: %v\n", err)
-		os.Exit(1)
+		// change directory to new directory
+		err = os.Chdir(selectedModel.projectName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error changing directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		if err := downloadProject(selectedModel.projectName, selectedModel.selected); err != nil {
+			handleError(err)
+		}
+
+		if err != nil {
+			handleError(err)
+		}
+		fmt.Println("Project created successfully!")
+	} else {
+		fmt.Println("Exiting program. No Project created.")
 	}
-
-	// change directory to new directory
-	err = os.Chdir(selectedModel.projectName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error changing directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := downloadProject(selectedModel.projectName, selectedModel.selected); err != nil {
-		handleError(err)
-	}
-
-	if err != nil {
-		handleError(err)
-	}
-	fmt.Println("Project created successfully!")
-
-	// reader := bufio.NewReader(os.Stdin)
-
-	// fmt.Printf("What would you like to call your project: ")
-
-	// // Read until newline
-	// newDir, _ := reader.ReadString('\n')
-
-	// // Remove the trailing newline
-	// newDir = strings.TrimSpace(newDir)
-
-	// fmt.Println("Your new project shall be named", newDir)
-
-	// // Create the directory for new project
-	// err := os.MkdirAll(newDir, 0755)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "Error creating directory: %v\n", err)
-	// 	os.Exit(1) //Indicate an error with a non-zero exit code
-	// }
-
-	// // Change directory to the new directory
-	// err = os.Chdir(newDir)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "Error changing directory: %v\n", err)
-	// 	os.Exit(1)
-	// }
-
-	// fmt.Println("Current working directory:", getCurrentDirectory())
-
-	// // Go get project and write it to this directory
-	// err = downloadAndExtract("smokeyblues", "aws-sstv4-notes", "main", ".", newDir)
-	// if err != nil {
-	// 	fmt.Println("error in the download and extraction process.")
-	// 	handleError(err)
-	// }
-
-	// fmt.Println("Project created successfully.")
 
 }
-
-// func getCurrentDirectory() string {
-// 	currentDir, err := os.Getwd()
-// 	if err != nil {
-// 		fmt.Fprintf(os.Stderr, "Error getting current directory: %v", err)
-// 		os.Exit(1)
-// 	}
-// 	return currentDir
-// }
 
 func handleError(err error) {
 	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
