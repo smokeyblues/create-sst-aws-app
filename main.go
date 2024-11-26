@@ -45,6 +45,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.String() == "q", msg.String() == "esc":
 			if m.showHelp {
 				m.showHelp = false
+				return m, tea.Quit
 			} else if !m.typing {
 				return m, tea.Quit
 			}
@@ -63,11 +64,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case msg.String() == "h":
-			if !m.typing {
-				m.showHelp = !m.showHelp
-			}
-			return m, nil
+		// case msg.String() == "h":
+		// 	if !m.typing {
+		// 		m.showHelp = !m.showHelp
+		// 	}
+		// 	return m, nil
 
 		case msg.String() == "enter":
 			if !m.typing {
@@ -75,7 +76,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			} else {
 				m.projectName = strings.TrimSpace(m.projectName)
-				return m, tea.Quit
+				if m.projectName != "" {
+					return m, tea.Quit
+				}
+				m.typing = false
+				return m, nil
 			}
 		case msg.String() == "backspace":
 			if m.typing && len(m.projectName) > 0 {
@@ -93,6 +98,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			} else if msg.String() == "j" && m.selected < len(m.choices)-1 {
 				m.selected++
+				return m, nil
+			} else if msg.String() == "h" {
+				m.showHelp = !m.showHelp
 				return m, nil
 			}
 		}
@@ -158,9 +166,15 @@ func main() {
 	}
 
 	// Check the model to determine if the program should quit or if the TUI quit so the program logic can begin.
-	if m.(model).projectName != "" {
+	if len(m.(model).projectName) > 0 {
 		selectedModel := m.(model)
 		fmt.Println("Creating project", selectedModel.projectName)
+
+		// Create new directory
+		err := os.MkdirAll(selectedModel.projectName, 0755)
+		if err != nil {
+			handleError(fmt.Errorf("error creating directory: %w", err))
+		}
 
 		// change directory to new directory
 		err = os.Chdir(selectedModel.projectName)
