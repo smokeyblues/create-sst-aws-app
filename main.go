@@ -26,7 +26,7 @@ type model struct {
 
 func initialModel() model {
 	return model{
-		choices:  []string{"Usage-based pricing", "SaaS pricing"},
+		choices:  []string{"No-Fee", "Usage-based pricing"},
 		selected: 0,
 	}
 }
@@ -63,12 +63,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selected++
 				}
 			}
-
-		// case msg.String() == "h":
-		// 	if !m.typing {
-		// 		m.showHelp = !m.showHelp
-		// 	}
-		// 	return m, nil
 
 		case msg.String() == "enter":
 			if !m.typing {
@@ -142,9 +136,9 @@ func downloadProject(projectName string, projectType int) error {
 	branch := "main"
 
 	if projectType == 0 {
-		repo = "aws-sstv4-notes"
+		repo = "base-aws-no-fee-notes-app"
 	} else if projectType == 1 {
-		repo = "aws-sst-saas-template"
+		repo = "base-aws-notes-app"
 	} else {
 		return fmt.Errorf("invalid project type selected")
 	}
@@ -260,27 +254,29 @@ func downloadAndExtract(owner, repo, branch, targetDir, newProjectName string) e
 			fmt.Printf("Writing file: %s\n", file.Name)
 
 			// buf := new(bytes.Buffer)
-			reader := io.TeeReader(rc, outfile)
+			// reader := io.TeeReader(rc, outfile)
 
-			fileBytes, err := io.ReadAll(reader)
+			fileBytes, err := io.ReadAll(rc)
 			if err != nil {
-				return fmt.Errorf("error reading from TeeReader: %w", err)
+				return fmt.Errorf("error reading content: %w", err)
 
 			}
 
+			var modifiedContent string
 			if strings.Contains(string(fileBytes), repo) {
 				re := regexp.MustCompile(regexp.QuoteMeta(repo))
 
-				modifiedContent := re.ReplaceAllLiteralString(string(fileBytes), newProjectName)
-				_, err = outfile.WriteAt([]byte(modifiedContent), 0)
-				if err != nil {
-					return fmt.Errorf("error writing modified content to file %s: %w", file.Name, err)
-				}
+				modifiedContent = re.ReplaceAllLiteralString(string(fileBytes), newProjectName)
 			} else {
-				_, err = io.Copy(outfile, rc)
-				if err != nil {
-					return fmt.Errorf("error copying file content %s: %w", file.Name, err)
-				}
+				modifiedContent = string(fileBytes)
+				// _, err = io.Copy(outfile, rc)
+				// if err != nil {
+				// 	return fmt.Errorf("error copying file content %s: %w", file.Name, err)
+				// }
+			}
+			_, err = outfile.Write([]byte(modifiedContent))
+			if err != nil {
+				return fmt.Errorf("error writing modified content to file %s: %w", file.Name, err)
 			}
 			rc.Close()
 		}
