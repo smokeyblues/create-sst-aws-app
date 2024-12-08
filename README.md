@@ -1,5 +1,5 @@
 # Serverless Fullstack Application Generator
-#### Video Demo: 
+#### Video Demo: https://youtu.be/wk5qKFf7Zow
 #### Description
 
 This command line tool generates a fullstack serverless application written in typescript and hosted on AWS using the SST framework. The template is based on a simple note taking app called Scratch. The steps for creating this app from scratch (pun not intended) is covered in the SST Guide. I recommend going through the guide at least once in order to become familiar with the framework and the intracacies of this app.
